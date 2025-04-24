@@ -1,4 +1,9 @@
 {
   "name": "zdbsp-wasm",
-  "author": "Sean Morris"
+  "author": "Sean Morris",
+  "files": [
+    "Zdbsp.js",
+    "Zdbsp.mjs",
+    "zdbsp.wasm"
+  ]
 }

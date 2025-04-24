@@ -1,0 +1,73 @@
+<DOCTYPE html>
+<head>
+	<script type = "module">
+		import Zdbsp from './Zdbsp.mjs';
+
+		const input = document.getElementById('wad-file');
+		const output = document.getElementById('output');
+
+		const zdbsp = await Zdbsp({
+			print: line => output.innerText += line + "\n",
+			// printErr: line => output.innerText += line,
+		});
+
+		const run = async (...args) => {
+			try
+			{
+				const ptrs = args.map(part => {
+					const len = zdbsp.lengthBytesUTF8(part) + 1;
+					const loc = zdbsp._malloc(len);
+					zdbsp.stringToUTF8(part, loc, len);
+					return loc;
+				});
+
+				const arLoc = zdbsp._malloc(4 * ptrs.length);
+
+				for(const i in ptrs)
+				{
+					zdbsp.setValue(arLoc + 4 * i, ptrs[i], '*');
+				}
+
+				const process = zdbsp.ccall(
+					'main'
+					, 'number'
+					, ['number', 'number']
+					, [ptrs.length, arLoc]
+					, {async: true}
+				);
+
+				ptrs.forEach(p => zdbsp._free(p));
+				zdbsp._free(arLoc);
+			}
+			catch(error)
+			{
+				if(!('status' in error) || error.status !== 0)
+				{
+					throw error;
+				}
+			}
+		}
+
+		input.addEventListener('change', async event => {
+			output.innerText = '';
+			const file = event.target.files[0];
+			const basename = file.name.split('.').slice(0, -1).join('')
+			zdbsp.FS.writeFile('/tmp/source.wad', new Uint8Array(await file.arrayBuffer()));
+			await run('zdbsp', '-rg', '/tmp/source.wad', '-o', '/tmp/out.wad');
+			const blob = new Blob([ zdbsp.FS.readFile('/tmp/out.wad') ], {type: 'application/x-doom'});
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = basename + '.gl.wad';
+			document.body.appendChild(a);
+			a.style = 'display: none';
+			a.click();
+			a.remove();
+			window.URL.revokeObjectURL(url);
+		});
+	</script>
+</head>
+<body>
+	<input id = "wad-file" type = "file" />
+	<div id = "output" style = "white-space: pre-wrap;;"></div>
+</body>
